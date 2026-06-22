@@ -1,0 +1,110 @@
+# configs/demo_local.toml
+# Stage 2 (Local refinement) demo inference config
+
+[Task]
+# IMPORTANT:
+# Set this to your demo workspace root
+# (the folder that contains trained_models/, demo_data/, configs/, etc.)
+project_path = "<PROJECT_ROOT>"
+task_name = "demo_local"
+trainer_name = "trainer_AE_local"
+
+[Run]
+# Inference uses [Inference].device; keep [Run] for completeness.
+device = "cuda:0"
+max_epochs = 1
+val_interval = 1
+reproducibility = true
+train_amp = true
+continue_training = false
+
+[Data]
+# (not used in inference, kept for completeness)
+dataloader_name = "DataloaderCorrespondence"
+
+[Data.DataloaderCorrespondence]
+n_pos = 128
+dataset_json = "<PROJECT_ROOT>/configs/demo.json"
+pixdim = [1.0, 1.0, 1.0]
+batch_size = 1
+num_workers = 2
+cache_rate = 0.0
+
+[Data.DataloaderCorrespondence.intensity_aug]
+enable = false
+prob = 0.8
+same_on_pair = false
+scale_range = 0.10
+shift_range = 0.10
+gamma_range = 0.20
+noise_std = 0.02
+clip = true
+clip_min = 0.0
+clip_max = 1.0
+
+[Model]
+model_name = "model_local"
+roi_size = [64, 64, 64]
+
+[Model.model_local]
+in_channels = 1
+base_channels = 32
+target_feature_size = 48
+num_res_units = 2
+backbone_stride = 4
+
+transf_layers = 2
+transf_heads = 4
+transf_dropout = 0.0
+
+[Model.Optimizer]
+name = "Adamw"
+learning_rate = 3e-4
+weight_decay = 1e-5
+
+[Model.LRScheduler]
+name = "CosineAnnealingLR"
+
+[Loss]
+loss_name = "loss_AE_loca_distance"
+n_neg = 512
+
+[Loss.loss_AE_loca_distance]
+sigma = 0.2
+tau = 0.1
+symmetric_nce = true
+w_mse = 1.0
+w_nce = 0.1
+
+[Inference]
+# Output folder:
+# <PROJECT_ROOT>/inference_results/demo_local/<output_dir_name>
+output_dir_name = "demo_local"
+
+# MUST point to Stage-1 output folder:
+# <PROJECT_ROOT>/inference_results/demo_coarse/demo_coarse/
+corse_path = "<PROJECT_ROOT>/inference_results/demo_coarse/demo_coarse"
+
+# Optional (leave empty for demo)
+radius_csv = ""
+
+# Inference module
+inference_name = "inference_local"
+inference_dataloader_name = "DataloaderCorrLandmark"
+device = "cuda:0"
+
+roi_size = [64, 64, 64]
+spacing = [1.0, 1.0, 1.0]
+
+# Loaded from:
+# <PROJECT_ROOT>/trained_models/demo_local/
+checkpoint_name = "stage2_refine.pth"
+
+# coarse-sim guided refinement
+coarse_sim_enable = true
+coarse_sim_max_error_vx = 16.0
+search_radius = 16
+
+[Inference.DataloaderCorrLandmark]
+# Users MUST edit demo.json paths to match local environment
+dataset_json = "<PROJECT_ROOT>/configs/demo.json"

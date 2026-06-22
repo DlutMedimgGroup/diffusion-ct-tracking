@@ -1,42 +1,75 @@
+# run_training.py
+
 import argparse
+import os
+import sys
 import toml
-from monai.config import print_config
-from monai.utils import set_determinism
 
-from utility import *
+import torch.multiprocessing
+torch.multiprocessing.set_sharing_strategy('file_system')
 
-def run_train():
-    # get config file path from argument
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", '--config', help="Path of config file.", required=True)
+# Add the project root to the Python path. This allows the script to be run
+# from anywhere and still find the custom modules (e.g., 'engine', 'models').
+project_root = os.path.dirname(os.path.abspath(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Now we can safely import from our custom packages.
+from trainer.trainer_base import get_class
+
+def main():
+    """
+    The main entry point for starting a training process.
+
+    This script parses a command-line argument for the configuration file path,
+    loads the configuration, dynamically instantiates the specified trainer,
+    and starts the training process by calling its .run() method.
+    """
+    # 1. --- Argument Parsing ---
+    # Set up an argument parser to accept the path to the config file.
+    parser = argparse.ArgumentParser(
+        description="Run a training session using a TOML configuration file."
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to the TOML configuration file for the training run.",
+    )
     args = parser.parse_args()
-    config_file_path = args.config
-    assert config_file_path.endswith(".toml"), "error: illegal config file path. (from run_training.py)"
-    
-    # import configs from config file
-    config = toml.load(config_file_path)
-    globalVal.device = config['Train']['device']
 
-    # working paths
-    task_name = config['Task']['task_name']
-    globalVal.project_path = config['Task']['project_path']
-    maybe_mkdir_p(globalVal.project_path)
-    globalVal.model_path = join(globalVal.project_path, 'trained_models', task_name)
-    maybe_mkdir_p(globalVal.model_path)
-    
-    # init log file, txt from print() will be automaticaly writhed into the log file
-    init_log_file(globalVal.model_path, prefix='training_log')
+    # 2. --- Configuration Loading ---
+    # Load the specified TOML configuration file.
+    try:
+        config = toml.load(args.config)
+        print(f"Successfully loaded configuration from: {args.config}")
+    except FileNotFoundError:
+        print(f"Error: Configuration file not found at '{args.config}'")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error loading or parsing TOML file: {e}")
+        sys.exit(1)
 
-    # trainer
-    trainer_name = config['Train']['trainer']
-    trainer_class = recursive_find_class(['trainer'], trainer_name, 'trainer')
-    assert trainer_class is not None, "error: trainer class not found. (from run_training.py)"
-    trainer = trainer_class(config)
+    # 3. --- Trainer Instantiation ---
+    # Dynamically get the trainer class specified in the config.
+    try:
+        trainer_name = config['Task']['trainer_name']
+        # The class must exist in the 'trainer' package.
+        trainer_class = get_class(f"trainer.{trainer_name}")
+        print(f"Instantiating trainer: '{trainer_name}'")
+    except KeyError:
+        print("Error: 'trainer_name' not found in the [Task] section of the config file.")
+        sys.exit(1)
 
-    # train
-    trainer.run_training()
+    # Create an instance of the trainer, passing the full configuration.
+    # The trainer and its components will handle parsing this config internally.
+    trainer = trainer_class(config=config)
 
+    # 4. --- Start Training ---
+    # The .run() method encapsulates the entire training and validation loop.
+    trainer.run()
+        
 
 if __name__ == "__main__":
-    
-    run_train()
+    main()
+

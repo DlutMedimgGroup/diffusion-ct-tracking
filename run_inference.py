@@ -1,40 +1,65 @@
+# run_inference.py
+
 import argparse
+import os
+import sys
+
 import toml
-from monai.config import print_config
-from monai.utils import set_determinism
 
-from utility import *
+from trainer.trainer_base import get_class
 
-def inference():
-    # get config file path from argument
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-c", '--config', help="Path of config file.", required=True)
+# Add the project root to Python path so local modules can be imported reliably.
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+
+def main() -> None:
+    """
+    Entry point for running inference using a TOML configuration file.
+
+    This script:
+      1) parses CLI args,
+      2) loads the TOML config,
+      3) dynamically instantiates an inference runner from `inference.<inference_name>`,
+      4) executes the inference pipeline via `runner.run()`.
+    """
+    # -------------------- 1) Parse arguments --------------------
+    parser = argparse.ArgumentParser(
+        description="Run inference using a TOML configuration file."
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        required=True,
+        help="Path to the TOML configuration file for inference.",
+    )
     args = parser.parse_args()
-    config_file_path = args.config
-    assert config_file_path.endswith(".toml"), "error: illegal config file path. (from inference.py)"
-    
-    # import configs from config file
-    config = toml.load(config_file_path)
-    globalVal.device = config['Inference']['device']
 
-    # working paths
-    task_name = config['Task']['task_name']
-    globalVal.project_path = config['Task']['project_path']
-    maybe_mkdir_p(globalVal.project_path)
-    globalVal.model_path = join(globalVal.project_path, 'trained_models')
-    maybe_mkdir_p(globalVal.model_path)
-    globalVal.output_path = join(globalVal.project_path, 'inference', config['Inference']['inference_name'])
-    maybe_mkdir_p(globalVal.output_path)
-    # init log file, txt from print() will be automaticaly writhed into the log file
-    init_log_file(globalVal.output_path, prefix='inference_log')
+    # -------------------- 2) Load config --------------------
+    try:
+        config = toml.load(args.config)
+        print(f"Loaded config from: {args.config}")
+    except Exception as e:
+        print(f"[Error] Failed to load or parse TOML config: {e}")
+        sys.exit(1)
 
-    # inference
-    inference_name = config['Inference']['inference']
-    inference_class = recursive_find_class(['inference'], inference_name, 'inference')
-    assert inference_class is not None, "error: inference class not found. (from run_inference.py)"
-    inference = inference_class(config)
-    inference.inference()
+    # -------------------- 3) Instantiate inference runner --------------------
+    try:
+        # Get the inference class name from the [Inference] section.
+        inference_name = config["Inference"]["inference_name"]
+        # The class must exist under the `inference` package.
+        inference_class = get_class(f"inference.{inference_name}")
+        print(f"Instantiating inference runner: '{inference_name}'")
+    except KeyError:
+        print("[Error] Missing 'inference_name' in the [Inference] section of the config.")
+        sys.exit(1)
+
+    inference_runner = inference_class(config=config)
+
+    # -------------------- 4) Run inference --------------------
+    inference_runner.run()
+
 
 if __name__ == "__main__":
-    
-    inference()
+    main()

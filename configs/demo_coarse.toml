@@ -1,0 +1,42 @@
+[Task]
+# IMPORTANT:
+# Set this to your demo workspace root (the folder that contains
+# trained_models/, demo_data/, configs/, etc.)
+project_path = "<PROJECT_ROOT>"
+task_name = "demo_coarse"
+
+[Model]
+model_name = "model_coarse_moco"
+roi_size = [160, 160, 160]
+
+[Model.model_coarse_moco]
+in_channels = 1
+num_res_units = 2
+target_feature_size = 32
+transformer_bottleneck = true
+noise_timestep = 49
+spacing = [1.0, 1.0, 1.0]
+moco_m = 0.999
+
+# === pretrained backbones (optional in inference) ===
+# Leave empty ("") to disable loading
+AE_WEIGHTS = ""
+UNET_WEIGHTS = ""
+
+[Inference]
+output_dir_name = "demo_coarse"
+inference_name = "inference_AE"
+inference_dataloader_name = "DataloaderCorrLandmark"
+device = "cuda:0"
+
+roi_size = [160, 160, 160]
+spacing = [1.0, 1.0, 1.0]
+
+# Loaded from:
+# <PROJECT_ROOT>/trained_models/demo_coarse/
+checkpoint_name = "stage1_coarse.pth"
+
+[Inference.DataloaderCorrLandmark]
+# Users MUST edit this file to match their local paths
+dataset_json = "<PROJECT_ROOT>/configs/demo.json"
+pixdim = [1.0, 1.0, 1.0]
