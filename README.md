@@ -1,4 +1,4 @@
-# Diffusion-Guided Anatomical Position Encoding for Dense Longitudinal CT Correspondence (Anonymous Submission)
+# Diffusion-Guided Anatomical Position Encoding for Dense Longitudinal CT Correspondence
 
 This repository provides the anonymized implementation of our MICCAI submission:
 
